@@ -12,30 +12,27 @@ sendTelegramMsg()
     else
         str="${telegramProxyUrl}?token=${telegramToken}&chatId=${telegramChatId}&text=$1"
     fi
-    curl -X GET "${str}"  -H 'cache-control: no-cache' > /dev/null
+    curl -X GET "${str}"  -H 'cache-control: no-cache' &> /dev/null
 }
 
-diskAvail=`df -BG | grep -w / | awk '{print $4}'` #assumed in Gigabyte
-diskAvail=${diskAvail:: -1} # remove last char maybe "G"
-
-if [ $diskAvail -lt $diskAvailLimit ]
-then
-    notification="/ disk space critically low! Avail: ${diskAvail}G"
-    encmsg=$(urlencode "$server $notification")
-
-    sendTelegramMsg ${encmsg}
-fi
-
-storageAvail=`df -BG | grep -w /home | awk '{print $4}'` #assumed in Gigabyte
-storageAvail=${storageAvail:-9999999G} # if /home is not available set a big number for it
-storageAvail=${storageAvail:: -1} # remove last char maybe "G"
-if [ $storageAvail -lt $storageAvailLimit ]
-then
-    notification="/home storage space critically low! Avail: ${storageAvail}G"
-    encmsg=$(urlencode "$server $notification")
-
-    sendTelegramMsg ${encmsg}
-fi
+# check all storages for available space
+storageLogStr=""
+lenStorageList=${#storageList[@]}
+for (( i=0; i<=$((lenStorageList-1)); i++ ))
+do 
+    storageAvail=`df -BG | grep -w ${storageList[$i]} | awk '{print $4}'` #assumed in Gigabyte
+    storageAvail=${storageAvail:-9999999G} # if the storage is not available set a big number for it
+    storageAvail=${storageAvail:: -1} # remove last char maybe "G"
+    [ "$DEBUG" = "1" ] && echo $i ${storageList[$i]} ${storageAvailLimit[$i]} $storageAvail
+    storageLogStr="$storageLogStr ${storageList[$i]}: ${storageAvail}G "
+    if [ $storageAvail -lt ${storageAvailLimit[$i]} ]
+    then
+        notification="${storageList[$i]} storage space critically low! Avail: ${storageAvail}G"
+        encmsg=$(urlencode "$server $notification")
+    
+        sendTelegramMsg ${encmsg}
+    fi
+done
 
 memAvail=`free -g | grep Mem | awk '{print $7}'` 
 if [ $memAvail -lt $memAvailLimit ]
@@ -65,4 +62,4 @@ then
     sendTelegramMsg ${encmsg}
 fi
 
-echo "`date` diskAvail: ${diskAvail}G storageAvail: ${storageAvail}G memAvail: ${memAvail}G 15 minutes load avg: ${fifteenMinLoadAvg}" >> ${scriptPath}/log.txt
+echo "`date` $storageLogStr memAvail: ${memAvail}G 15 minutes load avg: ${fifteenMinLoadAvg}" >> ${scriptPath}/log.txt
