@@ -13,3 +13,5 @@ telegramSendMethod="direct"
 telegramChatId=<CHAT-ID>
 telegramToken="<TOKEN>"
 telegramProxyUrl="http://<PROXY-URL>/telegram.php"
+arecaToolPath="<areca_raid_tool_path>"
+megaSASToolPath="<MegaCli_tool_path>"

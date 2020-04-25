@@ -1,8 +1,9 @@
 #!/bin/bash
 
-scriptPath=/home/mos/mos/simpleSysWatch
+scriptPath=/home/ali/parsaspace/simple-system-watch
 . ${scriptPath}/url_enc_dec.sh
 . ${scriptPath}/config.sh
+. ${scriptPath}/diskCheck.sh
 
 sendTelegramMsg()
 {
@@ -33,6 +34,17 @@ do
         sendTelegramMsg ${encmsg}
     fi
 done
+
+# check RAID health
+checkRaidHealth
+raidCheckRes=$?
+if [ ${raidCheckRes} -gt 0 ]
+then
+    notification="TEST - RAID Set is degraded."
+    encmsg=$(urlencode "$server $notification")
+    
+    sendTelegramMsg ${encmsg}
+fi
 
 memAvail=`free -g | grep Mem | awk '{print $7}'` 
 if [ $memAvail -lt $memAvailLimit ]
