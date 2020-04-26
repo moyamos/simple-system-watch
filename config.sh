@@ -4,6 +4,12 @@ server="[SERVER_NAME]"
 presentingTimeSlot="10"
 DEBUG="0"
 
+checkStorageSpace=on
+checkRAIDHealth=on
+checkMemory=on
+checkLoadAvg=on
+presenting=on
+
 storageList=("/" "/home")
 storageAvailLimit=(50 10) # Threshold for each entry of the storageList ; Gigabyte is assumed
 

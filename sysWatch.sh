@@ -16,62 +16,78 @@ sendTelegramMsg()
     curl -X GET "${str}"  -H 'cache-control: no-cache' &> /dev/null
 }
 
-# check all storages for available space
-storageLogStr=""
-lenStorageList=${#storageList[@]}
-for (( i=0; i<=$((lenStorageList-1)); i++ ))
-do 
-    storageAvail=`df -BG | grep -w ${storageList[$i]} | awk '{print $4}'` #assumed in Gigabyte
-    storageAvail=${storageAvail:-9999999G} # if the storage is not available set a big number for it
-    storageAvail=${storageAvail:: -1} # remove last char maybe "G"
-    [ "$DEBUG" = "1" ] && echo $i ${storageList[$i]} ${storageAvailLimit[$i]} $storageAvail
-    storageLogStr="$storageLogStr ${storageList[$i]}: ${storageAvail}G "
-    if [ $storageAvail -lt ${storageAvailLimit[$i]} ]
+if [ $checkStorageSpace = on ]
+then
+    # check all storages for available space
+    storageLogStr=""
+    lenStorageList=${#storageList[@]}
+    for (( i=0; i<=$((lenStorageList-1)); i++ ))
+    do 
+        storageAvail=`df -BG | grep -w ${storageList[$i]} | awk '{print $4}'` #assumed in Gigabyte
+        storageAvail=${storageAvail:-9999999G} # if the storage is not available set a big number for it
+        storageAvail=${storageAvail:: -1} # remove last char maybe "G"
+        [ "$DEBUG" = "1" ] && echo $i ${storageList[$i]} ${storageAvailLimit[$i]} $storageAvail
+        storageLogStr="$storageLogStr ${storageList[$i]}: ${storageAvail}G "
+        if [ $storageAvail -lt ${storageAvailLimit[$i]} ]
+        then
+            notification="${storageList[$i]} storage space critically low! Avail: ${storageAvail}G"
+            encmsg=$(urlencode "$server $notification")
+        
+            sendTelegramMsg ${encmsg}
+        fi
+    done
+fi
+
+if [ $checkRAIDHealth = on ]
+then
+    # check RAID health
+    checkRaidHealth
+    raidCheckRes=$?
+    if [ ${raidCheckRes} -gt 0 ]
     then
-        notification="${storageList[$i]} storage space critically low! Avail: ${storageAvail}G"
+        notification="TEST - RAID Set is degraded."
+        encmsg=$(urlencode "$server $notification")
+        
+        sendTelegramMsg ${encmsg}
+    fi
+fi
+
+if [ $checkMemory = on ]
+then
+    memAvail=`free -g | grep Mem | awk '{print $7}'` 
+    if [ $memAvail -lt $memAvailLimit ]
+    then
+        notification="available memory critically low! Avail: ${memAvail}G"
         encmsg=$(urlencode "$server $notification")
     
         sendTelegramMsg ${encmsg}
     fi
-done
+fi
 
-# check RAID health
-checkRaidHealth
-raidCheckRes=$?
-if [ ${raidCheckRes} -gt 0 ]
+if [ $checkLoadAvg = on ]
 then
-    notification="TEST - RAID Set is degraded."
-    encmsg=$(urlencode "$server $notification")
+     fifteenMinLoadAvg=`cat /proc/loadavg | awk '{print $3}' | awk -F. '{print $1}'`
+     cpuCount=`cat /proc/cpuinfo | grep processor | tail -n 1 | awk '{print $3}'`
+     
+     if [ $fifteenMinLoadAvg -gt $cpuCount ]
+     then
+         notification="CPU shortage! 15 minutes load avg: ${fifteenMinLoadAvg}"
+         encmsg=$(urlencode "$server $notification")
+     
+         sendTelegramMsg ${encmsg}
+     fi
+fi
+
+
+if [ $presenting = on ]
+then
+    if [ "`date +%H`" = ${presentingTimeSlot} ]
+    then
+        notification=" Present."
+        encmsg=$(urlencode "$server $notification")
     
-    sendTelegramMsg ${encmsg}
-fi
-
-memAvail=`free -g | grep Mem | awk '{print $7}'` 
-if [ $memAvail -lt $memAvailLimit ]
-then
-    notification="available memory critically low! Avail: ${memAvail}G"
-    encmsg=$(urlencode "$server $notification")
-
-    sendTelegramMsg ${encmsg}
-fi
-
-fifteenMinLoadAvg=`cat /proc/loadavg | awk '{print $3}' | awk -F. '{print $1}'`
-cpuCount=`cat /proc/cpuinfo | grep processor | tail -n 1 | awk '{print $3}'`
-
-if [ $fifteenMinLoadAvg -gt $cpuCount ]
-then
-    notification="CPU shortage! 15 minutes load avg: ${fifteenMinLoadAvg}"
-    encmsg=$(urlencode "$server $notification")
-
-    sendTelegramMsg ${encmsg}
-fi
-
-if [ "`date +%H`" = ${presentingTimeSlot} ]
-then
-    notification=" Present."
-    encmsg=$(urlencode "$server $notification")
-
-    sendTelegramMsg ${encmsg}
+        sendTelegramMsg ${encmsg}
+    fi
 fi
 
 echo "`date` $storageLogStr memAvail: ${memAvail}G 15 minutes load avg: ${fifteenMinLoadAvg}" >> ${scriptPath}/log.txt
