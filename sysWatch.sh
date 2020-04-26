@@ -27,7 +27,7 @@ then
         storageAvail=${storageAvail:-9999999G} # if the storage is not available set a big number for it
         storageAvail=${storageAvail:: -1} # remove last char maybe "G"
         [ "$DEBUG" = "1" ] && echo $i ${storageList[$i]} ${storageAvailLimit[$i]} $storageAvail
-        storageLogStr="$storageLogStr ${storageList[$i]}: ${storageAvail}G "
+        storageLogStr="$storageLogStr ${storageList[$i]}: ${storageAvail}G"
         if [ $storageAvail -lt ${storageAvailLimit[$i]} ]
         then
             notification="${storageList[$i]} storage space critically low! Avail: ${storageAvail}G"
@@ -40,21 +40,24 @@ fi
 
 if [ $checkRAIDHealth = on ]
 then
+    raidHealthLogStr="RAID set: OK"
     # check RAID health
     checkRaidHealth
     raidCheckRes=$?
     if [ ${raidCheckRes} -gt 0 ]
     then
-        notification="TEST - RAID Set is degraded."
+        notification="RAID Set is degraded."
         encmsg=$(urlencode "$server $notification")
         
         sendTelegramMsg ${encmsg}
+	raidHealthLogStr="RAID set: Degraded"
     fi
 fi
 
 if [ $checkMemory = on ]
 then
     memAvail=`free -g | grep Mem | awk '{print $7}'` 
+    memLogStr="memAvail: ${memAvail}G"
     if [ $memAvail -lt $memAvailLimit ]
     then
         notification="available memory critically low! Avail: ${memAvail}G"
@@ -67,6 +70,7 @@ fi
 if [ $checkLoadAvg = on ]
 then
      fifteenMinLoadAvg=`cat /proc/loadavg | awk '{print $3}' | awk -F. '{print $1}'`
+     loadAvgLogStr="15 minutes load avg: ${fifteenMinLoadAvg}"
      cpuCount=`cat /proc/cpuinfo | grep processor | tail -n 1 | awk '{print $3}'`
      
      if [ $fifteenMinLoadAvg -gt $cpuCount ]
@@ -77,7 +81,6 @@ then
          sendTelegramMsg ${encmsg}
      fi
 fi
-
 
 if [ $presenting = on ]
 then
@@ -90,4 +93,4 @@ then
     fi
 fi
 
-echo "`date` $storageLogStr memAvail: ${memAvail}G 15 minutes load avg: ${fifteenMinLoadAvg}" >> ${scriptPath}/log.txt
+echo "`date`$storageLogStr $memLogStr $loadAvgLogStr $raidHealthLogStr" >> ${scriptPath}/log.txt
